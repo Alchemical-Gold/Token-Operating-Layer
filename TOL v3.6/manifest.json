@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Claude 3.5 Sonnet Token Counter",
+  "version": "1.0",
+  "description": "Token counter for Claude 3.5 Sonnet",
+  "permissions": ["activeTab"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+        "16": "icons/TokenCounter16.png",
+        "48": "icons/TokenCounter48.png",
+        "128": "icons/TokenCounter128.png"
+            }
+  },
+  "icons": {
+    "16": "icons/TokenCounter16.png",
+    "48": "icons/TokenCounter48.png",
+    "128": "icons/TokenCounter128.png"
+  }
+}
+
+      
+  
+

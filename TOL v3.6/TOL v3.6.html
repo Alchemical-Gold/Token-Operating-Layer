@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Token Operating Layer (TOL v3.6)</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+    }
+
+    #modelSelector {
+      margin-bottom: 10px;
+    }
+
+    #query-area {
+      width: 100%;
+      height: 100px;
+      margin-bottom: 5px;
+      resize: vertical;
+    }
+
+    #preview-row {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 10px;
+    }
+
+    #token-preview-box {
+      background-color: #d8d8e0;
+      border-radius: 5px;
+      padding: 10px 12px;
+      font-size: 0.95em;
+    }
+
+    #token-preview-box span {
+      margin-left: 10px;
+      font-weight: bold;
+    }
+
+    #submit-query {
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+
+    #summary-checkbox-row {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 15px;
+      font-size: 0.95em;
+    }
+
+    #llm-response {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background-color: #f9f9f9;
+    }
+
+    #token-counter-log {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: #f0f0f0;
+      padding: 15px 10px;
+      font-size: 1.1em;
+    }
+
+    #token-counter-log h3 {
+      text-align: center;
+      margin-top: 0;
+      font-size: 1.3em;
+    }
+
+    #token-counters {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+    }
+
+    .token-counter {
+      margin: 5px 10px;
+      text-align: center;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      padding: 5px;
+      background-color: #ffffff;
+      min-width: 180px;
+      font-size: 1.05em;
+    }
+
+    .count-line {
+      white-space: nowrap;
+      display: inline-block;
+      margin-bottom: 4px;
+      font-weight: bold;
+    }
+
+    .popup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: white;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    button {
+      margin: 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <label for="modelSelector">Model:</label>
+  <select id="modelSelector">
+    <option value="gpt-4">GPT-4</option>
+    <option value="gpt-3.5">GPT-3.5</option>
+    <option value="claude-3">Claude 3 Sonnet</option>
+  </select>
+
+  <textarea id="query-area" placeholder="Type your query here..."></textarea>
+
+  <div id="preview-row">
+    <div id="token-preview-box">
+      Token Preview:
+      <span id="preview-count">0</span>
+      | Cost: <span id="preview-cost">$0.00000</span>
+      | kWh: <span id="preview-kwh">0.000000</span>
+    </div>
+    <button id="submit-query">Submit Query</button>
+  </div>
+
+  <div id="summary-checkbox-row">
+    <input type="checkbox" id="summarize-toggle" />
+    <label for="summarize-toggle">Summarize this chat session</label>
+  </div>
+
+  <div id="llm-response"></div>
+
+  <div id="token-counter-log">
+    <h3 id="token-log-header">Token Counter Log for: [MODEL]</h3>
+    <div id="token-counters">
+      <div class="token-counter">
+        <strong>User Tokens:</strong><br>
+        <span class="count-line">
+          <span class="count">0</span> (<span class="percentage">0%</span>)
+        </span><br>
+        Cost: <span class="cost">$0.00000</span><br>
+        kWh: <span class="kwh">0.000000</span>
+      </div>
+      <div class="token-counter">
+        <strong><span id="model-tokens-label">Claude Tokens:</span></strong><br>
+        <span class="count-line">
+          <span class="count">0</span> (<span class="percentage">0%</span>)
+        </span><br>
+        Cost: <span class="cost">$0.00000</span><br>
+        kWh: <span class="kwh">0.000000</span>
+      </div>
+      <div class="token-counter">
+        <strong>Total Tokens Used:</strong><br>
+        <span class="count-line">
+          <span class="count">0</span> (<span class="percentage">0%</span>)
+        </span><br>
+        Cost: <span class="cost">$0.00000</span><br>
+        kWh: <span class="kwh">0.000000</span>
+      </div>
+      <div class="token-counter">
+        <strong>Remaining Tokens:</strong><br>
+        <span class="count-line">
+          <span class="count">8000</span> (<span class="percentage">100%</span>)
+        </span><br>
+        Cost: <span class="cost">$0.00000</span><br>
+        kWh: <span class="kwh">0.000000</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="popup-summary" class="popup">
+    <h3>Chat Session Token Summary</h3>
+    <p id="summary-content"></p>
+    <button id="close-summary">Close</button>
+  </div>
+
+  <script>
+    const queryArea = document.getElementById('query-area');
+    const submitButton = document.getElementById('submit-query');
+    const llmResponse = document.getElementById('llm-response');
+    const modelSelector = document.getElementById('modelSelector');
+    const logHeader = document.getElementById('token-log-header');
+    const modelTokensLabel = document.getElementById('model-tokens-label');
+    const summarizeToggle = document.getElementById('summarize-toggle');
+    const totalLimit = 8000;
+    let userTokens = 0;
+    let claudeTokens = 0;
+
+    function updateModelHeaderText() {
+      const model = modelSelector.value;
+      logHeader.textContent = `Token Counter Log for: ${model.toUpperCase()}`;
+      modelTokensLabel.textContent = `${model.toUpperCase()} Tokens:`;
+    }
+
+    function countTokensForModel(prompt, model) {
+      switch (model) {
+        case "gpt-4":
+        case "gpt-4o":
+          return Math.ceil(prompt.split(/\s+/).length * 1.2);
+        case "gpt-3.5":
+          return Math.ceil(prompt.split(/\s+/).length);
+        case "claude-3":
+          return Math.ceil(prompt.split(/\s+/).length * 1.3);
+        default:
+          return prompt.split(/\s+/).length;
+      }
+    }
+
+    function getModelRates(model) {
+      switch (model) {
+        case "gpt-4":
+          return { costPerToken: 0.00003, kWhPerToken: 0.0000003 };
+        case "gpt-3.5":
+          return { costPerToken: 0.000002, kWhPerToken: 0.0000001 };
+        case "claude-3":
+          return { costPerToken: 0.000015, kWhPerToken: 0.00000025 };
+        default:
+          return { costPerToken: 0.00001, kWhPerToken: 0.0000002 };
+      }
+    }
+
+    function updateTokenDisplays() {
+      const model = modelSelector.value;
+      const { costPerToken, kWhPerToken } = getModelRates(model);
+      const totalTokens = userTokens + claudeTokens;
+      const remainingTokens = totalLimit - totalTokens;
+
+      const tokenBlocks = document.querySelectorAll('#token-counters .token-counter');
+      const counts = [userTokens, claudeTokens, totalTokens, remainingTokens];
+
+      tokenBlocks.forEach((block, i) => {
+        const percentage = ((counts[i] / totalLimit) * 100).toFixed(1);
+        const cost = (counts[i] * costPerToken).toFixed(5);
+        const kWh = (counts[i] * kWhPerToken).toFixed(6);
+        block.querySelector('.count').textContent = counts[i];
+        block.querySelector('.percentage').textContent = `${percentage}%`;
+        block.querySelector('.cost').textContent = `$${cost}`;
+        block.querySelector('.kwh').textContent = `${kWh}`;
+      });
+    }
+
+    function updateTokenPreview(text) {
+      const model = modelSelector.value;
+      const previewCount = countTokensForModel(text, model);
+      const { costPerToken, kWhPerToken } = getModelRates(model);
+      const cost = (previewCount * costPerToken).toFixed(5);
+      const kWh = (previewCount * kWhPerToken).toFixed(6);
+
+      document.getElementById('preview-count').textContent = previewCount;
+      document.getElementById('preview-cost').textContent = `$${cost}`;
+      document.getElementById('preview-kwh').textContent = kWh;
+    }
+
+    function showSummary() {
+      const summary = "This is a placeholder summary. Add custom logic here.";
+      document.getElementById('summary-content').textContent = summary;
+      document.getElementById('popup-summary').style.display = 'block';
+    }
+
+    submitButton.addEventListener('click', () => {
+      const model = modelSelector.value;
+
+      if (summarizeToggle.checked) {
+        queryArea.value = "";
+        showSummary();
+        return;
+      }
+
+      const inputText = queryArea.value;
+      const sampleResponse = "Sample Response: This is a placeholder for the LLM's response.";
+
+      userTokens = countTokensForModel(inputText, model);
+      claudeTokens = countTokensForModel(sampleResponse, model);
+      llmResponse.textContent = sampleResponse;
+
+      updateTokenDisplays();
+    });
+
+    queryArea.addEventListener('input', (e) => {
+      updateTokenPreview(e.target.value);
+    });
+
+    document.getElementById('close-summary').addEventListener('click', () => {
+      document.getElementById('popup-summary').style.display = 'none';
+    });
+
+    modelSelector.addEventListener('change', updateModelHeaderText);
+
+    window.addEventListener("DOMContentLoaded", () => {
+      if (window.location.hostname.includes("openai.com")) {
+        modelSelector.value = "gpt-4";
+      } else if (window.location.hostname.includes("claude.ai")) {
+        modelSelector.value = "claude-3";
+      }
+      updateModelHeaderText();
+    });
+  </script>
+</body>
+</html>
+
